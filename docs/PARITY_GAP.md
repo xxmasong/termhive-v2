@@ -1,5 +1,10 @@
 # v1 → v2 Parity Gap (P7)
 
+> **Status:** G1–G5 done and verified on the live deployment (`8cef2a1`).
+> **G6 (layout drag/resize) is the only item left**, plus the follow-ups in
+> "Remaining" at the bottom.
+
+
 Derived by diffing `reference/client/src` (v1, frozen) against `client/src` (v2),
 plus side-by-side screenshots of both running apps at the same viewport.
 
@@ -88,3 +93,29 @@ v2's `GridLayout.tsx` (758 lines) covers the modes but not drag/resize.
   constants, business logic in hooks, Recoil for UI/WS state, TanStack Query for REST.
 - Reuse existing atoms/molecules; do not introduce a second button or badge.
 - `tsc --noEmit` and `eslint` clean before handing back.
+
+---
+
+## Remaining after the G1–G5 pass
+
+Verified in a browser against the live site; none of these are caught by
+tsc/lint/build, which is why they need screenshot verification.
+
+- **G6 — layout drag/resize.** The five modes exist; drag-to-reorder,
+  drag-to-swap, resize dividers and persisted canvas positions do not.
+  `AgentPane` already renders the drag handle, so the affordance is visible
+  but inert — either wire it or hide it until G6 lands.
+- **Codex pane empty state** still has more vertical air than v1. Improved in
+  `8cef2a1` but not pixel-matched.
+- **Per-pane split/close controls** (v1's grid mode) are absent.
+- **Usage meters** depend on `/api/usage`; Claude renders only when the backend
+  returns a non-null `claude` entry. Hiding a null CLI matches v1
+  (`reference/.../Sidebar.tsx:204`) — do not "fix" that.
+
+### Lesson for this slice
+
+`agentInitials` was ported verbatim from v1 and still produced a real bug:
+v1's sample agents were named `CLAUDE`/`CODEX`, so its "first letter of each
+part" rule never collided. Ours are `claude-dev`/`codex-dev`, which both
+rendered `CD`. Verbatim ports inherit assumptions about the *data*, not just
+the code — check the port against our own fixtures, not v1's.
