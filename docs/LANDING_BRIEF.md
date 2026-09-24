@@ -295,3 +295,52 @@ Fine-grained, one purpose per commit, e.g.:
 8. landing: audience, FAQ, final CTA, SEO/title
 
 Stage explicit paths only. Never `git add -A` / `git add .`. Every commit must typecheck.
+
+---
+
+## 5. Addendum — Pricing (added 2026-09-24)
+
+Plans (authoritative, from the owner). "Agents" = agents that exist across **all**
+projects, running or stopped. Deleting one frees a slot.
+
+| Plan | Projects | Agents (total) |
+|---|---|---|
+| Free | 1 | 3 |
+| Pro | up to 3 | up to 10 |
+| Pro Plus | unlimited | up to 30 |
+
+Prices for Pro / Pro Plus are **not decided yet**. Model price as
+`price: string | null`; `null` renders the chip `Early access` in place of the
+price. Free renders `$0` + `forever`.
+
+### 5.1 Nav
+Add **Pricing** (#pricing) between Compare and FAQ (desktop nav, mobile sheet,
+footer "Product" column).
+
+### 5.2 Pricing section (`#pricing`) — placed after Comparison, before Audience
+- Eyebrow: `PRICING`
+- H2: **Start free. Grow your hive.**
+- Sub: `Every plan gets every CLI, the Keeper, agent messaging, shared memory and mobile access. Plans differ only in how big your hive can get.`
+- Three cards in a row (stack on mobile, Pro first on mobile). Equal height.
+  Card anatomy top→bottom: plan name (H3) · one-line pitch · price row ·
+  two big limit stats · CTA · divider · "Everything included" list.
+  - **Free** — pitch `Try a full hive on one project.` · `$0` + `forever` ·
+    stats `1` `project` / `3` `agents` · CTA secondary **Start free** → `ROUTES.SIGNUP`
+  - **Pro** (highlighted: 1px honey border, honey glow shadow, `Most popular` honey
+    chip top-right, raised −8px on desktop) — pitch `For builders running several projects at once.` ·
+    price (`null` → `Early access` chip) · stats `3` `projects` / `10` `agents` ·
+    CTA primary **Choose Pro** → `ROUTES.SIGNUP + '?plan=pro'`
+  - **Pro Plus** — pitch `For teams of agents at full scale.` · price (`null`) ·
+    stats `∞` `projects` / `30` `agents` · CTA secondary **Choose Pro Plus** → `ROUTES.SIGNUP + '?plan=pro-plus'`
+- Stats: number in `--l-ff-display` 600 2.25rem, label mono 12px `--l-text-3`
+  under it; the two stats side by side separated by a 1px `--l-line` divider.
+- "Everything included" (same list in every card, honey check icons, 0.925rem):
+  `Claude Code, Codex, Gemini CLI & OpenCode` · `The Keeper orchestrator` ·
+  `Agent-to-agent messaging` · `Shared wiki & files` · `Works on any device`
+- Note under cards (small, `--l-text-3`, centered): `Agents count across all projects, running or stopped. AI usage is billed by your own Claude, ChatGPT or Google plan.`
+
+### 5.3 FAQ changes
+- Replace answer of **What does it cost?** with:
+  `Free covers 1 project and 3 agents. Pro raises that to 3 projects and 10 agents; Pro Plus gives you unlimited projects and 30 agents. Your AI usage stays on your own Claude, ChatGPT or Google plan.`
+- Add after it: **What counts as an agent?** — `Every agent you create, running or stopped, across all your projects. Delete an agent to free its slot.`
+- Final CTA sub unchanged.
