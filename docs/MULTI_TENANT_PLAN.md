@@ -82,6 +82,14 @@ workspaces       (id uuid pk, user_id fk unique, state text,
                   container_id, internal_host, internal_port, volume_path,
                   image_tag, cpu_limit, mem_limit_mb, disk_limit_gb,
                   last_active_at, created_at)
+plans            (id text pk,                       -- free | pro | pro-plus
+                  name, max_projects int null,       -- null = unlimited
+                  max_agents int, cpu_limit, mem_limit_mb, disk_limit_gb,
+                  price_cents int null, active bool)
+subscriptions    (id uuid pk, user_id fk unique, plan_id fk,
+                  status text,                       -- active | past_due | canceled
+                  provider text null, provider_ref text null, -- billing TBD
+                  current_period_end timestamptz null, created_at, updated_at)
 invites          (code_hash pk, created_by, max_uses, uses, expires_at)
 audit_log        (id bigserial, user_id, action, detail jsonb, ip, at)
 ```
@@ -92,6 +100,30 @@ Workspace contents (projects, agents, wiki, brain) **stay as files inside the
 user's volume** for now. Moving them into Postgres would force rewriting
 `src/storage.ts` and the contract for no isolation benefit. Revisit only if we
 need cross-user features (team sharing).
+
+### Plans (owner-defined)
+
+| Plan | Projects | Agents (total, all projects, running or stopped) |
+|---|---|---|
+| free | 1 | 3 |
+| pro | 3 | 10 |
+| pro-plus | unlimited | 30 |
+
+**Enforcement — must live inside the workspace, not only the proxy.** Projects
+and agents are created by two paths: the REST API *and* the Keeper's MCP tools
+(`hive.ts` → daemon → storage), which never pass through the proxy. Both end in
+`storage.createProject` / `storage.createAgent`, so that is the single choke
+point:
+- Control plane starts each container with `TERMHIVE_MAX_PROJECTS` /
+  `TERMHIVE_MAX_AGENTS` (env, not a file — agents can write anything in HOME).
+- `storage.create*` refuses over-limit creates; REST returns
+  `403 {error, code:'PLAN_LIMIT', limit, used}`; the Keeper tool returns the same
+  message as a tool error. This is an additive error field — contract-compatible.
+- Client shows an upgrade dialog on `PLAN_LIMIT` (links to `/#pricing`).
+- Plan change → control plane recreates the container with new env + cgroup
+  limits (a few seconds). Downgrade never deletes data: existing extras stay,
+  new creates are blocked until under the limit.
+- cgroup CPU/RAM/disk per plan is the hard backstop (agents have a shell).
 
 ## 5. Folder structure
 
@@ -147,8 +179,8 @@ and nobody connected for N hours; wake on login (cold start ~5–15 s).
 |---|---|
 | M0 | Decisions in §10 made; CT101/CT102 checkouts reconciled; landing branch merged |
 | M1 | Login / signup / verify / reset UI (Claude designs, same token system as landing) against a mocked API |
-| M2 | Control plane: Postgres schema + migrations, email+password + Google (+GitHub), server sessions, invites |
-| M3 | Runtime image + workspace changes in §6 |
+| M2 | Control plane: Postgres schema + migrations, email+password + Google (+GitHub), server sessions, invites, plans/subscriptions |
+| M3 | Runtime image + workspace changes in §6 + plan-limit enforcement in `storage.ts` + upgrade dialog |
 | M4 | Provisioner (Docker API), HTTP+WS reverse proxy, "preparing your workspace" screen, lifecycle/sleep |
 | M5 | Hardening: egress firewall, quotas, rate limits, audit log, admin page |
 | M6 | Migrate today's CT102 data into the first admin workspace; deploy; public DNS |
@@ -160,4 +192,5 @@ and nobody connected for N hours; wake on login (cold start ~5–15 s).
 3. Sign-in methods — email+password (needs an SMTP provider), Google, GitHub.
 4. Signup policy — open, waitlist, or invite codes (recommended for launch).
 5. Public domain — e.g. `termhive.xenitsystems.com` via the SG Cloudflare tunnel.
-6. Per-user limits — RAM/CPU/disk per workspace, max concurrent agents.
+6. Per-plan resources — RAM/CPU/disk for free / pro / pro-plus (project/agent counts are decided).
+7. Pricing + billing provider for Pro / Pro Plus (e.g. Stripe); until then paid plans are "early access".
