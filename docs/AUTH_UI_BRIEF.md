@@ -95,23 +95,36 @@ ring. Error: border `oklch(64% 0.19 25)` + message 13px below. Labels 13px 500.
 - Missing token → error state `This reset link is invalid or has expired.` + link `Request a new one` → `/forgot-password`.
 - Success → `Password updated.` + primary `Sign in` → `/login`.
 
-## API (control plane, M2) — `features/auth/api/authApi.ts`
+## API — Firebase + control plane
 
-All JSON, same-origin, `credentials: 'same-origin'`. Errors: `{ error: string, code?: string }`.
+Identity lives in **Firebase Authentication**; the control plane only exchanges a
+Firebase ID token for its own session cookie. Firebase sends the verification
+and password-reset emails.
+
+Client (Firebase JS SDK, loaded only in the auth chunk; config from `GET /auth/config`):
+
+| Page | Firebase calls |
+|---|---|
+| Login | `signInWithEmailAndPassword` → unverified → `/verify-email`; else session exchange → `/app` |
+| Signup | `createUserWithEmailAndPassword` → `updateProfile(name)` → `sendEmailVerification` → `/verify-email` (plan + invite kept in `sessionStorage` until the first exchange) |
+| Google / GitHub | `signInWithPopup` → session exchange |
+| Verify email | `sendEmailVerification(currentUser)` (60 s cooldown); `I've verified my email` → `reload()` → session exchange |
+| Forgot password | `sendPasswordResetEmail` |
+| `/account/action` | Firebase email links: `mode=verifyEmail` → `applyActionCode`; `mode=resetPassword` → `confirmPasswordReset` (`/reset-password` redirects here) |
+
+Control plane (same-origin JSON, errors `{ error: string, code?: string }`):
 
 ```
-POST /auth/login            {email, password}               → 200 {ok:true}
-POST /auth/signup           {name, email, password, plan, inviteCode?} → 201 {status:'verify_email'}
-POST /auth/verify/resend    {email}                         → 204
-POST /auth/password/forgot  {email}                         → 204
-POST /auth/password/reset   {token, password}               → 204
-GET  /auth/google?plan=&invite= GET /auth/github?plan=&invite= (full-page redirects)
+GET  /auth/config    → {configured:true, apiKey, authDomain, projectId, appId} | {configured:false}
+POST /auth/session   {idToken, plan?, inviteCode?} → 200 {ok:true} + th_session cookie
+                     403 EMAIL_UNVERIFIED | SIGNUPS_CLOSED | INVALID_INVITE, 429 RATE_LIMITED
+GET  /auth/me        → {user, plan, workspace:{state}} | 401
+POST /auth/logout    → 204
 ```
 
-Mutations via plain `fetch` in hooks (`useLogin`, `useSignup`, …) — no
-TanStack here, auth pages must stay light. Business logic (validation,
-error-code mapping, cooldown timer) lives in hooks; client-side validation mirrors
-the password rules before submit.
+Firebase error codes map to the copy above (`auth/invalid-credential`,
+`auth/email-already-in-use`, `auth/weak-password`, `auth/too-many-requests`;
+`auth/popup-closed-by-user` is silent). Business logic stays in hooks.
 
 ## Accessibility
 
